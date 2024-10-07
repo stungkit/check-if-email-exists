@@ -18,23 +18,23 @@
 //! functions, depending on whether the `bulk` feature is enabled or not.
 
 use check_if_email_exists::{setup_sentry, LOG_TARGET};
+use reacher_worker::config::load_config;
+use reacher_worker::db::create_db;
+use reacher_worker::worker::run_worker;
+use reacher_worker::CARGO_PKG_VERSION;
 use tracing::info;
 
-use reacher_backend::http::run_warp_server;
-
-const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
-
-/// Run a HTTP server using warp with bulk endpoints.
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 	// Initialize logging.
 	tracing_subscriber::fmt::init();
-	info!(target: LOG_TARGET, version=?CARGO_PKG_VERSION, "Running Reacher");
+	info!(target: LOG_TARGET, version=?CARGO_PKG_VERSION, "Running Reacher Worker");
 
 	// Setup sentry bug tracking.
 	let _guard: sentry::ClientInitGuard = setup_sentry();
 
-	let _bulk_job_runner = run_warp_server().await?;
+	let config = load_config()?;
+	let pg_pool = create_db(&config).await?;
 
-	Ok(())
+	run_worker(config, pg_pool).await
 }
